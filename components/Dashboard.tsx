@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import type { AppState, Budget, Transaction } from '../types';
-import { LightbulbIcon, ArrowPathIcon, PlusCircleIcon, BudgetIcon } from './Icons';
+import { LightbulbIcon, ArrowPathIcon, PlusCircleIcon, BudgetIcon, LockClosedIcon, ListBulletIcon } from './Icons';
 
 interface DashboardProps {
   state: AppState;
@@ -17,6 +17,7 @@ interface DashboardProps {
   onAddBudget: () => void;
   onReorderBudgets: (reorderedBudgets: Budget[]) => void;
   onSetBudgetPermanence: (budgetId: number, isTemporary: boolean) => void;
+  onOpenBatchInput: () => void;
 }
 
 const formatCurrency = (amount: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
@@ -44,7 +45,8 @@ const OverviewCard: React.FC<{
     totalDailySpentToday: number;
     onUseDailyBudget: () => void;
     onViewDailyHistory: () => void;
-}> = ({ monthlyIncome, totalUsedOverall, totalRemaining, currentAvailableFunds, totalDailySpentToday, onUseDailyBudget, onViewDailyHistory }) => {
+    onOpenBatchInput: () => void;
+}> = ({ monthlyIncome, totalUsedOverall, totalRemaining, currentAvailableFunds, totalDailySpentToday, onUseDailyBudget, onViewDailyHistory, onOpenBatchInput }) => {
     const remainingDays = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - new Date().getDate() + 1;
     const dailyBudgetMax = remainingDays > 0 ? currentAvailableFunds / remainingDays : currentAvailableFunds;
     const dailyBudgetRemaining = dailyBudgetMax - totalDailySpentToday;
@@ -82,9 +84,16 @@ const OverviewCard: React.FC<{
                     </p>
                 </div>
                 
-                <button onClick={onUseDailyBudget} className="w-full bg-accent-teal text-white font-bold py-3 px-4 rounded-lg hover:bg-accent-teal-dark transition-colors shadow">
-                    Catat Pengeluaran
-                </button>
+                <div className="grid grid-cols-2 gap-3">
+                    <button onClick={onUseDailyBudget} className="w-full bg-accent-teal text-white font-bold py-3 px-4 rounded-lg hover:bg-accent-teal-dark transition-colors shadow flex items-center justify-center gap-2">
+                         <PlusCircleIcon className="w-5 h-5" />
+                        <span>Catat</span>
+                    </button>
+                     <button onClick={onOpenBatchInput} className="w-full bg-white border-2 border-accent-teal text-accent-teal font-bold py-3 px-4 rounded-lg hover:bg-teal-50 transition-colors shadow flex items-center justify-center gap-2">
+                        <ListBulletIcon className="w-5 h-5" />
+                        <span>Sekaligus</span>
+                    </button>
+                </div>
             </div>
         </section>
     );
@@ -102,16 +111,14 @@ const AIInsightCard: React.FC<{
                     <LightbulbIcon className="w-6 h-6 text-warning-yellow" />
                     <h2 className="text-xl font-bold text-primary-navy">Wawasan AI</h2>
                 </div>
-                <button onClick={onRefresh} disabled={isLoading} className="text-primary-navy disabled:text-gray-400 disabled:cursor-not-allowed">
-                    <ArrowPathIcon className="w-6 h-6" isSpinning={isLoading} />
+                <button disabled={true} className="text-primary-navy disabled:text-gray-400 disabled:cursor-not-allowed">
+                    <ArrowPathIcon className="w-6 h-6" isSpinning={false} />
                 </button>
             </div>
-            <div className="text-dark-text prose prose-sm max-w-none">
-                {isLoading ? (
-                    <p className="text-center text-secondary-gray">Menganalisis data Anda...</p>
-                ) : (
-                    formatMarkdown(insight)
-                )}
+            <div className="text-center py-4 text-secondary-gray">
+                <LockClosedIcon className="w-12 h-12 mx-auto text-gray-300" />
+                <p className="mt-2 font-semibold">Fitur Terkunci</p>
+                <p className="text-sm">Tingkatkan ke versi premium untuk membuka wawasan AI.</p>
             </div>
         </section>
     );
@@ -329,6 +336,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                 totalDailySpentToday={totalDailySpentToday}
                 onUseDailyBudget={props.onUseDailyBudget}
                 onViewDailyHistory={props.onViewDailyHistory}
+                onOpenBatchInput={props.onOpenBatchInput}
             />
             
             <AIInsightCard 

@@ -9,7 +9,7 @@ import Achievements from './components/Achievements';
 import PersonalBest from './components/PersonalBest';
 import NetWorth from './components/NetWorth';
 import { allAchievements } from './data/achievements';
-import { HomeIcon, ChartBarIcon, DocumentTextIcon, ListBulletIcon, Squares2x2Icon, PlusCircleIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, CameraIcon, LightbulbIcon, SparklesIcon, SpeakerWaveIcon, ChatBubbleLeftRightIcon, PaperAirplaneIcon, TrashIcon, BuildingLibraryIcon, BudgetIcon, availableIcons, availableColors, TrophyIcon, Cog6ToothIcon, InformationCircleIcon, ExclamationTriangleIcon, ArchiveBoxIcon, ArrowUturnLeftIcon, ServerStackIcon, FireIcon, CircleStackIcon } from './components/Icons';
+import { HomeIcon, ChartBarIcon, DocumentTextIcon, ListBulletIcon, Squares2x2Icon, PlusCircleIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, CameraIcon, LightbulbIcon, SparklesIcon, SpeakerWaveIcon, ChatBubbleLeftRightIcon, PaperAirplaneIcon, TrashIcon, BuildingLibraryIcon, BudgetIcon, availableIcons, availableColors, TrophyIcon, Cog6ToothIcon, InformationCircleIcon, ExclamationTriangleIcon, ArchiveBoxIcon, ArrowUturnLeftIcon, ServerStackIcon, FireIcon, CircleStackIcon, LockClosedIcon } from './components/Icons';
 
 // --- UTILITY FUNCTIONS ---
 const formatCurrency = (amount: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount);
@@ -138,9 +138,9 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose, onConfirm,
 
 // --- APP COMPONENT ---
 type Page = 'dashboard' | 'reports' | 'visualizations' | 'savings' | 'achievements' | 'personalBest' | 'netWorth';
-type ModalType = 'input' | 'funds' | 'addBudget' | 'history' | 'info' | 'menu' | 'editAsset' | 'confirm' | 'scanResult' | 'aiAdvice' | 'smartInput' | 'aiChat' | 'voiceAssistant' | 'voiceResult' | 'addSavingsGoal' | 'addSavings' | 'savingsDetail' | 'settings' | 'archivedBudgets' | 'backupRestore' | 'asset';
+type ModalType = 'input' | 'funds' | 'addBudget' | 'history' | 'info' | 'menu' | 'editAsset' | 'confirm' | 'scanResult' | 'aiAdvice' | 'smartInput' | 'aiChat' | 'voiceAssistant' | 'voiceResult' | 'addSavingsGoal' | 'addSavings' | 'savingsDetail' | 'settings' | 'archivedBudgets' | 'backupRestore' | 'asset' | 'batchInput';
 
-const APP_VERSION = '3.11.0';
+const APP_VERSION = '3.12.0';
 const BACKUP_PREFIX = 'budgetAppBackup_';
 const MAX_BACKUPS = 4;
 
@@ -174,7 +174,7 @@ const DailyBackupToast: React.FC<{
         >
             <ArrowDownTrayIcon className="w-10 h-10 text-accent-teal flex-shrink-0" />
             <div>
-                <p className="font-bold text-primary-navy">Cadangan Harian Tersedia</p>
+                <p className="font-bold text-primary-navy">Cadangan Periodik Tersedia</p>
                 <p className="text-sm text-secondary-gray">Simpan data Anda untuk keamanan.</p>
                 <div className="flex gap-3 mt-2">
                     <a 
@@ -367,31 +367,44 @@ const App: React.FC = () => {
         localStorage.setItem(`budgetAppState_v${APP_VERSION}`, JSON.stringify(state));
     }, [state]);
 
-    // Daily backup useEffect
+    // Periodic backup useEffect (every 4 days)
     useEffect(() => {
         if (backupCreatedToday.current) return;
 
         const hasData = state.budgets.length > 0 || state.dailyExpenses.length > 0 || state.fundHistory.length > 0;
-        if (!hasData) return; // Don't run on initial empty state
+        if (!hasData) return;
 
-        const todayStr = new Date().toLocaleDateString('fr-CA');
-        const lastExportDate = localStorage.getItem('lastAutoExportDate');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const lastExportDateStr = localStorage.getItem('lastAutoExportDate');
+        let shouldCreateBackup = true;
 
-        if (todayStr !== lastExportDate) {
+        if (lastExportDateStr) {
+            const lastExportDate = new Date(lastExportDateStr);
+            lastExportDate.setHours(0, 0, 0, 0);
+            const timeDiff = today.getTime() - lastExportDate.getTime();
+            const daysDiff = timeDiff / (1000 * 3600 * 24);
+            if (daysDiff < 4) {
+                shouldCreateBackup = false;
+            }
+        }
+
+        if (shouldCreateBackup) {
             try {
+                const todayStrForFilename = new Date().toLocaleDateString('fr-CA');
                 const dataStr = JSON.stringify(state, null, 2);
                 const dataBlob = new Blob([dataStr], { type: "application/json" });
                 const url = URL.createObjectURL(dataBlob);
-                const filename = `cadangan_anggaran_${todayStr}.json`;
+                const filename = `cadangan_anggaran_${todayStrForFilename}.json`;
                 
                 setDailyBackup({ url, filename });
-                localStorage.setItem('lastAutoExportDate', todayStr);
-                backupCreatedToday.current = true; // Mark as created for this session
+                localStorage.setItem('lastAutoExportDate', new Date().toLocaleDateString('fr-CA'));
+                backupCreatedToday.current = true;
             } catch (error) {
-                console.error("Failed to create daily backup:", error);
+                console.error("Failed to create periodic backup:", error);
             }
         } else {
-             backupCreatedToday.current = true; // Mark as done for today if localStorage says so
+            backupCreatedToday.current = true; // Mark as checked for this session
         }
     }, [state]);
 
@@ -653,7 +666,7 @@ const App: React.FC = () => {
             const newBudgets = JSON.parse(JSON.stringify(prev.budgets)); // Deep copy
 
             items.forEach(item => {
-                if (item.budgetId === 'none') return;
+                if (item.budgetId === 'none' || item.amount <= 0 || !item.desc.trim()) return;
                 
                 const newTransaction: Transaction = {
                     desc: item.desc,
@@ -728,7 +741,7 @@ const App: React.FC = () => {
                     if (goal.history.length < originalHistoryLength) {
                         const newSavedAmount = goal.savedAmount - transactionToDelete.amount;
                         goal.savedAmount = newSavedAmount < 0 ? 0 : newSavedAmount;
-                        goal.isCompleted = goal.savedAmount >= goal.targetAmount;
+                        goal.isCompleted = !goal.isInfinite && goal.targetAmount ? goal.savedAmount >= goal.targetAmount : false;
                     }
                 }
             }
@@ -793,11 +806,12 @@ const App: React.FC = () => {
     };
 
     // --- SAVINGS GOAL HANDLERS ---
-    const handleAddSavingsGoal = (name: string, targetAmount: number) => {
+    const handleAddSavingsGoal = (name: string, isInfinite: boolean, targetAmount?: number) => {
         const newGoal: SavingsGoal = {
             id: Date.now(),
             name,
-            targetAmount,
+            targetAmount: isInfinite ? undefined : targetAmount,
+            isInfinite: isInfinite,
             savedAmount: 0,
             history: [],
             createdAt: Date.now(),
@@ -834,7 +848,7 @@ const App: React.FC = () => {
                         ...g,
                         savedAmount: newSavedAmount,
                         history: [...g.history, newHistory],
-                        isCompleted: newSavedAmount >= g.targetAmount,
+                        isCompleted: !g.isInfinite && g.targetAmount ? newSavedAmount >= g.targetAmount : false,
                     };
                 }
                 return g;
@@ -845,11 +859,37 @@ const App: React.FC = () => {
         setActiveModal(null);
     };
 
+    const handleOpenSavingsGoal = (goalId: number) => {
+        const goal = state.savingsGoals.find(g => g.id === goalId);
+        if (!goal || !goal.isInfinite) return;
+
+        openConfirm(`Anda yakin ingin "membuka" tabungan "${goal.name}"? Dana sebesar ${formatCurrency(goal.savedAmount)} akan dikembalikan ke dana tersedia dan tabungan ini akan menjadi kosong.`, () => {
+             updateState(prev => {
+                const newFundHistory = goal.savedAmount > 0 ? [...prev.fundHistory, {
+                    type: 'add' as const,
+                    desc: `Dana dari tabungan: ${goal.name}`,
+                    amount: goal.savedAmount,
+                    timestamp: Date.now(),
+                }] : prev.fundHistory;
+
+                const newSavingsGoals = prev.savingsGoals.map(g => 
+                    g.id === goalId ? { ...g, savedAmount: 0, history: [], isCompleted: false } : g
+                );
+
+                return { ...prev, fundHistory: newFundHistory, savingsGoals: newSavingsGoals };
+            });
+        });
+    };
+
      const handleDeleteSavingsGoal = (goalId: number) => {
         const goal = state.savingsGoals.find(g => g.id === goalId);
         if (!goal) return;
 
-        openConfirm(`Anda yakin ingin menghapus celengan "${goal.name}"? Dana sebesar ${formatCurrency(goal.savedAmount)} akan dikembalikan ke dana tersedia.`, () => {
+        const message = goal.isInfinite ?
+            `Anda yakin ingin menghapus celengan "${goal.name}"? Dana sebesar ${formatCurrency(goal.savedAmount)} akan dikembalikan.` :
+            `Anda yakin ingin menghapus celengan "${goal.name}"? Dana sebesar ${formatCurrency(goal.savedAmount)} akan dikembalikan ke dana tersedia.`;
+
+        openConfirm(message, () => {
              updateState(prev => {
                 const newFundHistory = goal.savedAmount > 0 ? [...prev.fundHistory, {
                     type: 'add' as const,
@@ -1351,6 +1391,7 @@ Your response MUST be a valid JSON array containing only the numbers (timestamps
         setCurrentAssetId(assetId);
         setActiveModal('asset');
     }
+    const openBatchInput = () => setActiveModal('batchInput');
     
     // --- RENDER LOGIC ---
     const calculateUserLevel = (points: number): { level: string; currentLevelPoints: number; nextLevelPoints: number | null; } => {
@@ -1407,6 +1448,7 @@ Your response MUST be a valid JSON array containing only the numbers (timestamps
                             onOpenAddGoalModal={() => setActiveModal('addSavingsGoal')} 
                             onOpenAddSavingsModal={(goalId) => { setCurrentSavingsGoalId(goalId); setActiveModal('addSavings'); }}
                             onOpenDetailModal={(goalId) => { setCurrentSavingsGoalId(goalId); setActiveModal('savingsDetail'); }}
+                            onOpenSavingsGoal={handleOpenSavingsGoal}
                         />;
             case 'achievements':
                 const unlockedAchIds = Object.keys(state.unlockedAchievements);
@@ -1447,6 +1489,7 @@ Your response MUST be a valid JSON array containing only the numbers (timestamps
                     onAddBudget={() => setActiveModal('addBudget')}
                     onReorderBudgets={handleReorderBudgets}
                     onSetBudgetPermanence={handleSetBudgetPermanence}
+                    onOpenBatchInput={openBatchInput}
                 />;
         }
     };
@@ -1517,6 +1560,13 @@ Your response MUST be a valid JSON array containing only the numbers (timestamps
                 />
             </Modal>
 
+            <Modal isOpen={activeModal === 'batchInput'} onClose={() => setActiveModal(null)} title="Catat Banyak Pengeluaran" size="lg">
+                <BatchInputModalContent 
+                    budgets={state.budgets.filter(b => !b.isArchived)}
+                    onSave={handleSaveScannedItems}
+                />
+            </Modal>
+
             <Modal isOpen={activeModal === 'addBudget'} onClose={() => setActiveModal(null)} title="Buat Pos Anggaran Baru">
                 <AddBudgetModalContent onSubmit={handleAddBudget} />
             </Modal>
@@ -1573,11 +1623,11 @@ Your response MUST be a valid JSON array containing only the numbers (timestamps
                     onNavigate={(page) => { setCurrentPage(page); setActiveModal(null); }}
                     onShowInfo={() => setActiveModal('info')}
                     onManageFunds={() => setActiveModal('funds')}
-                    onScanReceipt={() => scanFileInputRef.current?.click()}
-                    onSmartInput={() => { setActiveModal('smartInput'); setSmartInputResult([]); setSmartInputError(null); }}
-                    onVoiceInput={() => setActiveModal('voiceAssistant')}
-                    onAskAI={handleOpenAIChat}
-                    onGetAIAdvice={handleGetAIAdvice}
+                    onScanReceipt={() => {}}
+                    onSmartInput={() => {}}
+                    onVoiceInput={() => {}}
+                    onAskAI={() => {}}
+                    onGetAIAdvice={() => {}}
                     onOpenSettings={() => setActiveModal('settings')}
                 />
             </Modal>
@@ -1802,45 +1852,8 @@ const InputModalContent: React.FC<{
         setIsSuggesting(false);
     }, [mode, budget, prefillData]);
 
-    const handleDescBlur = async () => {
-        if (target === 'daily' && desc.trim().length > 3 && allBudgets.length > 0) {
-            setIsSuggesting(true);
-            setSuggestion(null);
-            setSuggestedCategory(null);
-            try {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-                const validCategories = [...allBudgets.map(b => b.name), 'Uang Harian'];
-                
-                const schema = {
-                    type: Type.OBJECT,
-                    properties: {
-                        category: {
-                            type: Type.STRING,
-                            description: "The suggested category name.",
-                            enum: validCategories
-                        },
-                    },
-                    required: ["category"],
-                };
-
-                const response = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
-                    contents: { parts: [{ text: `Analyze the transaction description "${desc}" and determine the most suitable budget category from the provided list. Respond with the name of the best category.` }] },
-                    config: { responseMimeType: 'application/json', responseSchema: schema },
-                });
-
-                const result = JSON.parse(response.text);
-                if (result.category && result.category !== 'Uang Harian') {
-                    setSuggestion(`Transaksi ini mungkin lebih cocok untuk pos "${result.category}".`);
-                    setSuggestedCategory(result.category);
-                }
-            } catch (e) {
-                console.error("Failed to get category suggestion:", e);
-                // Fail silently, do not show error to user
-            } finally {
-                setIsSuggesting(false);
-            }
-        }
+    const handleDescBlur = () => {
+        // AI suggestion feature is now locked/disabled.
     };
 
 
@@ -2863,24 +2876,35 @@ const MainMenu: React.FC<{
     onOpenSettings: () => void 
 }> = (props) => {
     const menuItems = [
-        { icon: BuildingLibraryIcon, label: 'Celengan', action: () => props.onNavigate('savings') },
-        { icon: CircleStackIcon, label: 'Aset & Kekayaan', action: () => props.onNavigate('netWorth') },
-        { icon: TrophyIcon, label: 'Lencana', action: () => props.onNavigate('achievements') },
-        { icon: FireIcon, label: 'Pencapaian Terbaik', action: () => props.onNavigate('personalBest') },
-        { icon: ListBulletIcon, label: 'Info Bulanan', action: props.onShowInfo },
-        { icon: DocumentTextIcon, label: 'Kelola Dana', action: props.onManageFunds },
-        { icon: CameraIcon, label: 'Scan Struk', action: props.onScanReceipt },
-        { icon: SparklesIcon, label: 'Input Cerdas', action: props.onSmartInput },
-        { icon: LightbulbIcon, label: 'Saran AI', action: props.onGetAIAdvice },
-        { icon: ChatBubbleLeftRightIcon, label: 'Tanya AI', action: props.onAskAI },
-        { icon: SpeakerWaveIcon, label: 'Asisten Suara', action: props.onVoiceInput },
-        { icon: Cog6ToothIcon, label: 'Pengaturan', action: props.onOpenSettings },
+        { icon: BuildingLibraryIcon, label: 'Celengan', action: () => props.onNavigate('savings'), disabled: false },
+        { icon: CircleStackIcon, label: 'Aset & Kekayaan', action: () => props.onNavigate('netWorth'), disabled: false },
+        { icon: TrophyIcon, label: 'Lencana', action: () => props.onNavigate('achievements'), disabled: false },
+        { icon: FireIcon, label: 'Pencapaian Terbaik', action: () => props.onNavigate('personalBest'), disabled: false },
+        { icon: ListBulletIcon, label: 'Info Bulanan', action: props.onShowInfo, disabled: false },
+        { icon: DocumentTextIcon, label: 'Kelola Dana', action: props.onManageFunds, disabled: false },
+        { icon: CameraIcon, label: 'Scan Struk', action: () => {}, disabled: true },
+        { icon: SparklesIcon, label: 'Input Cerdas', action: () => {}, disabled: true },
+        { icon: LightbulbIcon, label: 'Saran AI', action: () => {}, disabled: true },
+        { icon: ChatBubbleLeftRightIcon, label: 'Tanya AI', action: () => {}, disabled: true },
+        { icon: SpeakerWaveIcon, label: 'Asisten Suara', action: () => {}, disabled: true },
+        { icon: Cog6ToothIcon, label: 'Pengaturan', action: props.onOpenSettings, disabled: false },
     ];
     return (
          <div className="grid grid-cols-4 gap-2">
             {menuItems.map(item => (
-                <button key={item.label} onClick={item.action} className="flex flex-col items-center justify-center p-2 rounded-lg hover:bg-gray-100 transition-colors space-y-1">
+                <button 
+                    key={item.label} 
+                    onClick={item.action} 
+                    disabled={item.disabled}
+                    className="relative flex flex-col items-center justify-center p-2 rounded-lg hover:bg-gray-100 transition-colors space-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    title={item.disabled ? 'Fitur Terkunci' : ''}
+                >
                     <item.icon className="w-8 h-8 text-primary-navy" />
+                    {item.disabled && (
+                        <div className="absolute top-1 right-1 bg-gray-600 bg-opacity-80 rounded-full p-0.5">
+                            <LockClosedIcon className="w-3 h-3 text-white" />
+                        </div>
+                    )}
                     <span className="text-xs text-center text-secondary-gray">{item.label}</span>
                 </button>
             ))}
@@ -2888,26 +2912,44 @@ const MainMenu: React.FC<{
     );
 };
 
-const AddSavingsGoalModalContent: React.FC<{ onSubmit: (name: string, targetAmount: number) => void }> = ({ onSubmit }) => {
+const AddSavingsGoalModalContent: React.FC<{ onSubmit: (name: string, isInfinite: boolean, targetAmount?: number) => void }> = ({ onSubmit }) => {
     const [name, setName] = useState('');
     const [amount, setAmount] = useState('');
+    const [isInfinite, setIsInfinite] = useState(false);
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const rawAmount = getRawNumber(amount);
-        if (name.trim() && rawAmount > 0) {
-            onSubmit(name.trim(), rawAmount);
+        if (name.trim() && (isInfinite || rawAmount > 0)) {
+            onSubmit(name.trim(), isInfinite, isInfinite ? undefined : rawAmount);
         }
     };
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <div>
                 <label htmlFor="goal-name" className="block text-sm font-medium text-secondary-gray">Nama Tujuan</label>
-                <input type="text" id="goal-name" value={name} onChange={e => setName(e.target.value)} required placeholder="Contoh: Laptop Baru" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-navy focus:border-primary-navy"/>
+                <input type="text" id="goal-name" value={name} onChange={e => setName(e.target.value)} required placeholder="Contoh: Dana Darurat" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-navy focus:border-primary-navy"/>
             </div>
-            <div>
-                <label htmlFor="goal-amount" className="block text-sm font-medium text-secondary-gray">Target Dana (Rp)</label>
-                <input type="text" id="goal-amount" value={amount} onChange={e => setAmount(formatNumberInput(e.target.value))} required placeholder="Contoh: 15.000.000" inputMode="numeric" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-navy focus:border-primary-navy"/>
+            
+            <div className="flex items-center">
+                <input
+                    id="is-infinite-checkbox"
+                    type="checkbox"
+                    checked={isInfinite}
+                    onChange={e => setIsInfinite(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-primary-navy focus:ring-primary-navy"
+                />
+                <label htmlFor="is-infinite-checkbox" className="ml-2 block text-sm text-secondary-gray">
+                    Tabungan tanpa target
+                </label>
             </div>
+
+            {!isInfinite && (
+                <div>
+                    <label htmlFor="goal-amount" className="block text-sm font-medium text-secondary-gray">Target Dana (Rp)</label>
+                    <input type="text" id="goal-amount" value={amount} onChange={e => setAmount(formatNumberInput(e.target.value))} required={!isInfinite} placeholder="Contoh: 15.000.000" inputMode="numeric" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-navy focus:border-primary-navy"/>
+                </div>
+            )}
             <button type="submit" className="w-full bg-primary-navy text-white font-bold py-3 rounded-lg hover:bg-primary-navy-dark transition-colors">Buat Celengan</button>
         </form>
     );
@@ -2963,5 +3005,91 @@ const SavingsDetailModalContent: React.FC<{ goal?: SavingsGoal; onDelete: () => 
         </div>
     );
 }
+
+const BatchInputModalContent: React.FC<{ 
+    budgets: Budget[];
+    onSave: (items: ScannedItem[]) => void;
+}> = ({ budgets, onSave }) => {
+    const [items, setItems] = useState<ScannedItem[]>([{ desc: '', amount: 0, budgetId: 'daily' }]);
+
+    const updateItem = (index: number, field: keyof ScannedItem, value: string | number) => {
+        const newItems = [...items];
+        if (field === 'amount') {
+            newItems[index][field] = getRawNumber(value as string);
+        } else if (field === 'budgetId') {
+            newItems[index][field] = value === 'daily' ? 'daily' : Number(value);
+        } else {
+            newItems[index][field] = value as string;
+        }
+        setItems(newItems);
+    };
+
+    const addItem = () => {
+        setItems([...items, { desc: '', amount: 0, budgetId: 'daily' }]);
+    };
+
+    const deleteItem = (indexToDelete: number) => {
+        if (items.length > 1) {
+            setItems(items.filter((_, index) => index !== indexToDelete));
+        }
+    };
+
+    const totalAmount = useMemo(() => items.reduce((sum, item) => sum + item.amount, 0), [items]);
+
+    return (
+        <div className="space-y-4">
+            <div className="max-h-[50vh] overflow-y-auto space-y-3 pr-2 -mx-2 px-2">
+                {items.map((item, index) => (
+                    <div key={index} className="p-3 bg-gray-50 rounded-lg border flex flex-col sm:flex-row gap-3">
+                        <div className="flex-grow space-y-2">
+                            <input
+                                type="text"
+                                placeholder="Keterangan"
+                                value={item.desc}
+                                onChange={(e) => updateItem(index, 'desc', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm"
+                            />
+                            <input
+                                type="text"
+                                placeholder="Nominal"
+                                value={item.amount > 0 ? formatNumberInput(item.amount) : ''}
+                                onChange={(e) => updateItem(index, 'amount', e.target.value)}
+                                inputMode="numeric"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm"
+                            />
+                        </div>
+                        <div className="flex-shrink-0 sm:w-48 space-y-2">
+                             <select 
+                                value={String(item.budgetId)} 
+                                onChange={(e) => updateItem(index, 'budgetId', e.target.value)}
+                                className="w-full h-10 px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm text-sm"
+                            >
+                                <option value="daily">Uang Harian</option>
+                                {budgets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                            </select>
+                            <button onClick={() => deleteItem(index)} disabled={items.length <= 1} className="w-full h-10 flex items-center justify-center bg-gray-200 text-dark-text font-bold rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                               <TrashIcon className="w-5 h-5"/>
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+             <button onClick={addItem} className="w-full flex items-center justify-center gap-2 bg-white border-2 border-dashed border-secondary-gray text-secondary-gray font-bold py-2 px-4 rounded-lg hover:bg-gray-50 hover:text-dark-text hover:border-dark-text transition-colors">
+                <PlusCircleIcon className="w-5 h-5" />
+                <span>Tambah Item</span>
+            </button>
+            <div className="border-t pt-4">
+                <div className="flex justify-between items-center mb-4">
+                    <span className="font-semibold text-secondary-gray">Total Pengeluaran</span>
+                    <span className="font-bold text-xl text-danger-red">{formatCurrency(totalAmount)}</span>
+                </div>
+                <button onClick={() => onSave(items)} disabled={items.every(i => i.amount <= 0 || !i.desc.trim())} className="w-full bg-accent-teal text-white font-bold py-3 rounded-lg hover:bg-accent-teal-dark transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    Simpan Semua
+                </button>
+            </div>
+        </div>
+    );
+};
+
 
 export default App;

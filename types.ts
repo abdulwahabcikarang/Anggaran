@@ -46,7 +46,8 @@ export interface SavingTransaction {
 export interface SavingsGoal {
   id: number;
   name: string;
-  targetAmount: number;
+  targetAmount?: number;
+  isInfinite: boolean;
   savedAmount: number;
   history: SavingTransaction[];
   createdAt: number;

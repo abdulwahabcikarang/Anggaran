@@ -3,9 +3,8 @@ import {
     PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, 
     BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid 
 } from 'recharts';
-import { GoogleGenAI } from '@google/genai';
 import type { AppState, Budget, GlobalTransaction } from '../types';
-import { LightbulbIcon, SparklesIcon } from './Icons';
+import { LightbulbIcon, SparklesIcon, LockClosedIcon } from './Icons';
 
 interface VisualizationsProps {
     state: AppState;
@@ -38,65 +37,31 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return null;
 };
 
-const formatMarkdown = (text: string) => {
-    return text
-        .split('\n')
-        .map((line, index) => {
-            if (line.trim().startsWith('* ')) {
-                return <li key={index} className="ml-5 list-disc">{line.trim().substring(2)}</li>;
-            }
-            if (line.trim().startsWith('**') && line.trim().endsWith('**')) {
-                return <p key={index} className="font-bold mt-2">{line.trim().replace(/\*\*/g, '')}</p>
-            }
-            return <p key={index}>{line}</p>;
-        });
-};
-
-
-const AIAnalysisCard: React.FC<{
-    title: string;
-    analysis: string | null;
-    isLoading: boolean;
-    error: string | null;
-}> = ({ title, analysis, isLoading, error }) => {
-    return (
-        <div className="mt-6 bg-blue-50 border-l-4 border-primary-navy p-4 rounded-r-lg">
-            <div className="flex items-center space-x-2 mb-2">
-                <LightbulbIcon className="w-6 h-6 text-primary-navy" />
-                <h3 className="text-lg font-bold text-primary-navy">{title}</h3>
-            </div>
-            {isLoading && <p className="text-secondary-gray animate-pulse">Menganalisis data...</p>}
-            {error && <p className="text-danger-red">{error}</p>}
-            {analysis && !isLoading && !error && (
-                <div className="text-dark-text prose prose-sm max-w-none">
-                    {formatMarkdown(analysis)}
-                </div>
-            )}
+const LockedAIAnalysisCard: React.FC<{ title: string }> = ({ title }) => (
+    <div className="mt-6 bg-gray-50 border-l-4 border-gray-300 p-4 rounded-r-lg">
+        <div className="flex items-center space-x-2 mb-2 opacity-50">
+            <LightbulbIcon className="w-6 h-6 text-gray-400" />
+            <h3 className="text-lg font-bold text-gray-400">{title}</h3>
         </div>
-    );
-};
+        <div className="text-center py-2 text-secondary-gray">
+            <LockClosedIcon className="w-8 h-8 mx-auto text-gray-300" />
+            <p className="mt-1 text-sm font-semibold">Fitur AI Terkunci</p>
+        </div>
+    </div>
+);
 
-const AIForecastCard: React.FC<{
-    forecast: string | null;
-    isLoading: boolean;
-    error: string | null;
-}> = ({ forecast, isLoading, error }) => {
-    return (
-        <section className="bg-white rounded-xl p-6 shadow-md border-t-4 border-accent-teal">
-            <div className="flex items-center space-x-3 mb-2">
-                <SparklesIcon className="w-7 h-7 text-accent-teal" />
-                <h2 className="text-xl font-bold text-primary-navy">Prediksi & Peringatan Dini</h2>
-            </div>
-             {isLoading && <p className="text-secondary-gray text-center animate-pulse">AI sedang menghitung proyeksi keuangan Anda...</p>}
-             {error && <p className="text-danger-red text-center">{error}</p>}
-             {forecast && !isLoading && !error && (
-                <p className="text-center text-lg text-dark-text font-semibold mt-2">
-                    {forecast}
-                </p>
-            )}
-        </section>
-    );
-};
+const LockedAIForecastCard: React.FC = () => (
+    <section className="bg-white rounded-xl p-6 shadow-md border-t-4 border-gray-300">
+        <div className="flex items-center space-x-3 mb-2 opacity-50">
+            <SparklesIcon className="w-7 h-7 text-gray-400" />
+            <h2 className="text-xl font-bold text-gray-400">Prediksi & Peringatan Dini</h2>
+        </div>
+        <div className="text-center py-4 text-secondary-gray">
+            <LockClosedIcon className="w-12 h-12 mx-auto text-gray-300" />
+            <p className="mt-2 font-semibold">Fitur Terkunci</p>
+        </div>
+    </section>
+);
 
 
 const TransactionDetailModal: React.FC<{
@@ -140,25 +105,6 @@ const Visualizations: React.FC<VisualizationsProps> = ({ state, onBack }) => {
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
     const [detailModalData, setDetailModalData] = useState<{ category: string; transactions: GlobalTransaction[] } | null>(null);
 
-    // AI Analysis State
-    const [trendAnalysis, setTrendAnalysis] = useState<string | null>(null);
-    const [isFetchingTrend, setIsFetchingTrend] = useState(false);
-    const [trendError, setTrendError] = useState<string | null>(null);
-
-    const [budgetAnalysis, setBudgetAnalysis] = useState<string | null>(null);
-    const [isFetchingBudget, setIsFetchingBudget] = useState(false);
-    const [budgetError, setBudgetError] = useState<string | null>(null);
-
-    const [pieAnalysis, setPieAnalysis] = useState<string | null>(null);
-    const [isFetchingPie, setIsFetchingPie] = useState(false);
-    const [pieError, setPieError] = useState<string | null>(null);
-    
-    // AI Forecast State
-    const [aiForecast, setAiForecast] = useState<string | null>(null);
-    const [isFetchingForecast, setIsFetchingForecast] = useState(false);
-    const [forecastError, setForecastError] = useState<string | null>(null);
-
-
     const allExpenses = useMemo((): GlobalTransaction[] => {
         let expenses: GlobalTransaction[] = [];
         state.archives.forEach(archive => expenses.push(...archive.transactions.filter(t => t.type === 'remove')));
@@ -184,16 +130,6 @@ const Visualizations: React.FC<VisualizationsProps> = ({ state, onBack }) => {
             ? allExpenses 
             : allExpenses.filter(e => new Date(e.timestamp).toISOString().startsWith(selectedMonth));
     }, [allExpenses, selectedMonth]);
-    
-    const totalIncomeForMonth = useMemo(() => {
-        if (selectedMonth === 'all') return 0;
-        
-        const incomeTransactions = state.fundHistory.filter(t => 
-            t.type === 'add' && new Date(t.timestamp).toISOString().startsWith(selectedMonth)
-        );
-        return incomeTransactions.reduce((sum, t) => sum + t.amount, 0);
-    }, [state.fundHistory, selectedMonth]);
-
 
     const pieChartData = useMemo(() => {
         const expenseByCategory: { [key: string]: number } = {};
@@ -258,147 +194,6 @@ const Visualizations: React.FC<VisualizationsProps> = ({ state, onBack }) => {
         }));
     }, [filteredExpenses, state.budgets]);
     
-    // --- AI Analysis Effects ---
-    useEffect(() => {
-        const fetchAnalysis = async () => {
-            if (!trendData || trendData.every(d => d.total === 0)) {
-                setTrendAnalysis("Tidak ada data pengeluaran untuk dianalisis pada periode ini.");
-                return;
-            }
-            setIsFetchingTrend(true);
-            setTrendError(null);
-            try {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-                const prompt = `Jelaskan tren pengeluaran harian ini dalam 2-3 poin singkat dan mudah dimengerti. Fokus pada kapan pengeluaran tertinggi terjadi dan apa pola utamanya. Gunakan Bahasa Indonesia yang santai. Data (IDR): ${JSON.stringify(trendData.filter(d => d.total > 0))}`;
-
-                const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-                setTrendAnalysis(response.text);
-            } catch (error) {
-                console.error("Trend Analysis Error:", error);
-                setTrendError("Gagal mendapatkan analisis AI.");
-            } finally {
-                setIsFetchingTrend(false);
-            }
-        };
-        fetchAnalysis();
-    }, [trendData]);
-    
-    useEffect(() => {
-        const fetchAnalysis = async () => {
-            if (budgetComparisonData.length === 0) {
-                setBudgetAnalysis("Tidak ada pos anggaran untuk dibandingkan.");
-                return;
-            }
-            setIsFetchingBudget(true);
-            setBudgetError(null);
-            try {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-                const prompt = `Dari data perbandingan anggaran ini, sebutkan kategori mana yang paling boros dan mana yang paling hemat. Berikan satu saran praktis yang mudah diikuti. Gunakan Bahasa Indonesia yang santai dalam format poin. Data (IDR): ${JSON.stringify(budgetComparisonData)}`;
-
-                const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-                setBudgetAnalysis(response.text);
-            } catch (error) {
-                console.error("Budget Analysis Error:", error);
-                setBudgetError("Gagal mendapatkan analisis AI.");
-            } finally {
-                setIsFetchingBudget(false);
-            }
-        };
-        fetchAnalysis();
-    }, [budgetComparisonData]);
-
-    useEffect(() => {
-        const fetchAnalysis = async () => {
-            if (pieChartData.length === 0) {
-                setPieAnalysis("Tidak ada data pengeluaran untuk dianalisis pada periode ini.");
-                return;
-            }
-            setIsFetchingPie(true);
-            setPieError(null);
-            try {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-                const prompt = `Lihat data alokasi pengeluaran ini. Sebutkan 2 kategori teratas kemana uang paling banyak dihabiskan. Beri satu kesimpulan singkat yang mudah dipahami. Gunakan Bahasa Indonesia yang santai dalam format poin. Data (IDR): ${JSON.stringify(pieChartData)}`;
-
-                const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-                setPieAnalysis(response.text);
-            } catch (error) {
-                console.error("Pie Analysis Error:", error);
-                setPieError("Gagal mendapatkan analisis AI.");
-            } finally {
-                setIsFetchingPie(false);
-            }
-        };
-        fetchAnalysis();
-    }, [pieChartData]);
-    
-     useEffect(() => {
-        const fetchForecast = async () => {
-            if (selectedMonth === 'all') {
-                setAiForecast(null);
-                return;
-            }
-            
-            const year = Number(selectedMonth.slice(0, 4));
-            const month = Number(selectedMonth.slice(5, 7)) - 1;
-            const today = new Date();
-            const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
-
-            if (!isCurrentMonth) {
-                setAiForecast('Prediksi hanya tersedia untuk bulan berjalan.');
-                return;
-            }
-            if (totalIncomeForMonth === 0) {
-                setAiForecast('Tambahkan pemasukan bulan ini untuk melihat prediksi.');
-                return;
-            }
-            
-            setIsFetchingForecast(true);
-            setForecastError(null);
-            
-            const daysPassed = today.getDate();
-            const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
-            const totalExpensesSoFar = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
-
-            if (totalExpensesSoFar === 0) {
-                setAiForecast("Belum ada pengeluaran. Anda di jalur yang tepat untuk berhemat!");
-                setIsFetchingForecast(false);
-                return;
-            }
-
-            try {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-                const prompt = `
-                    Anda adalah seorang analis keuangan. Berdasarkan data berikut, buat prediksi pengeluaran total di akhir bulan dan berikan peringatan dini jika diproyeksikan akan melebihi pemasukan.
-
-                    Data Keuangan (Bulan Berjalan dalam IDR):
-                    - Total Pemasukan Bulan Ini: ${totalIncomeForMonth}
-                    - Total Pengeluaran Hingga Saat Ini: ${totalExpensesSoFar}
-                    - Hari yang Telah Berlalu: ${daysPassed}
-                    - Total Hari dalam Bulan Ini: ${totalDaysInMonth}
-
-                    Tugas:
-                    1. Hitung proyeksi pengeluaran total untuk akhir bulan berdasarkan rata-rata pengeluaran harian saat ini.
-                    2. Bandingkan proyeksi tersebut dengan total pemasukan.
-                    3. Berikan satu kalimat kesimpulan yang singkat, jelas, dan ramah dalam Bahasa Indonesia. Contoh: "Peringatan! Dengan tren saat ini, Anda diproyeksikan akan melebihi anggaran sebesar [jumlah]." atau "Anda di jalur yang tepat! Diprediksi akan ada sisa dana sebesar [jumlah] di akhir bulan."
-                    
-                    Langsung berikan kalimat kesimpulan tersebut tanpa penjelasan tambahan.
-                `;
-                
-                const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-                setAiForecast(response.text);
-
-            } catch (error) {
-                console.error("AI Forecast Error:", error);
-                setForecastError("Gagal mendapatkan prediksi AI.");
-            } finally {
-                setIsFetchingForecast(false);
-            }
-        };
-
-        fetchForecast();
-    }, [selectedMonth, filteredExpenses, totalIncomeForMonth]);
-
-
     const titleText = selectedMonth === 'all' 
                     ? 'Semua Waktu' 
                     : new Date(selectedMonth + '-02').toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
@@ -430,11 +225,7 @@ const Visualizations: React.FC<VisualizationsProps> = ({ state, onBack }) => {
             </header>
 
             {selectedMonth !== 'all' && (
-                 <AIForecastCard
-                    forecast={aiForecast}
-                    isLoading={isFetchingForecast}
-                    error={forecastError}
-                />
+                 <LockedAIForecastCard />
             )}
 
             {selectedMonth !== 'all' && (
@@ -458,12 +249,7 @@ const Visualizations: React.FC<VisualizationsProps> = ({ state, onBack }) => {
                             </div>
                         )}
                     </div>
-                     <AIAnalysisCard
-                        title="Analisis AI Tren Harian"
-                        analysis={trendAnalysis}
-                        isLoading={isFetchingTrend}
-                        error={trendError}
-                    />
+                     <LockedAIAnalysisCard title="Analisis AI Tren Harian" />
                 </section>
             )}
 
@@ -483,12 +269,7 @@ const Visualizations: React.FC<VisualizationsProps> = ({ state, onBack }) => {
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
-                     <AIAnalysisCard
-                        title="Analisis AI Perbandingan Anggaran"
-                        analysis={budgetAnalysis}
-                        isLoading={isFetchingBudget}
-                        error={budgetError}
-                    />
+                     <LockedAIAnalysisCard title="Analisis AI Perbandingan Anggaran" />
                 </section>
             )}
 
@@ -543,12 +324,7 @@ const Visualizations: React.FC<VisualizationsProps> = ({ state, onBack }) => {
                         )}
                     </tbody>
                 </table>
-                 <AIAnalysisCard
-                    title="Analisis AI Alokasi Pengeluaran"
-                    analysis={pieAnalysis}
-                    isLoading={isFetchingPie}
-                    error={pieError}
-                />
+                 <LockedAIAnalysisCard title="Analisis AI Alokasi Pengeluaran" />
             </section>
             
             {detailModalData && (
